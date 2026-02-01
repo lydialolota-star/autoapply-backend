@@ -9,8 +9,8 @@ app.use(express.json());
 
 // 数据库连接（你的 Supabase）
 const supabase = createClient(
-  'https://你的-project-url.supabase.co',  // 换成你的真实URL
-  'sb_secret_你的-key'  // 换成你的真实service_role key
+  'https://prmjdpysdhpbiwrlnstc.supabase.co',  // 换成你的真实URL
+  'sb_secret_EpIlAS84HYEeN4XOjaTD1Q_MKTE9LqN'  // 换成你的真实service_role key
 );
 
 // OpenAI 配置（关键！）
@@ -117,3 +117,4 @@ if (process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT || 3001;
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }
+
