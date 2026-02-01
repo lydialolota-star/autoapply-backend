@@ -108,6 +108,118 @@ ${jobDescription}
 app.post('/api/applications', async (req, res) => {
   res.json({ message: "功能开发中" });
 });
+// 文件解析接口（支持PDF/Word/TXT）
+const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
+
+app.post('/api/parse-resume', async (req, res) => {
+  try {
+    const { fileContent, fileType, fileName } = req.body;
+    
+    if (!fileContent) {
+      return res.status(400).json({ error: '没有文件内容' });
+    }
+
+    let text = '';
+    const buffer = Buffer.from(fileContent, 'base64');
+
+    // 根据类型解析
+    if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
+      const pdfData = await pdfParse(buffer);
+      text = pdfData.text;
+    } 
+    else if (fileType.includes('word') || fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+      const result = await mammoth.extractRawText({ buffer });
+      text = result.value;
+    }
+    else if (fileType === 'text/plain' || fileName.endsWith('.txt')) {
+      text = buffer.toString('utf-8');
+    }
+    else {
+      return res.status(400).json({ error: '不支持的文件格式，请上传PDF、Word或TXT' });
+    }
+
+    // 使用OpenAI提取结构化信息
+    const prompt = `从以下简历文本中提取关键信息，返回JSON格式：
+    
+简历文本：
+${text.substring(0, 3000)}  // 限制长度避免token超限
+
+请提取并返回以下JSON格式：
+{
+  "full_name": "姓名",
+  "email": "邮箱",
+  "phone": "电话",
+  "education": [
+    {
+      "school": "学校名",
+      "degree": "学历（本科/硕士/博士）",
+      "major": "专业",
+      "end_date": "毕业时间（YYYY-MM）"
+    }
+  ],
+  "experience": [
+    {
+      "company": "公司名",
+      "position": "职位",
+      "description": "工作内容（概括）"
+    }
+  ],
+  "projects": [
+    {
+      "name": "项目名",
+      "description": "项目描述"
+    }
+  ],
+  "skills": {
+    "professional": "技能（用逗号分隔）"
+  }
+}
+
+注意：
+1. 如果某项找不到，返回空字符串或空数组
+2. 只返回JSON，不要其他文字
+3. 日期统一格式YYYY-MM
+4. 如果没有明确信息，合理推断`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",  // 或 gpt-4
+      messages: [
+        { role: "system", content: "你是一个简历信息提取助手，擅长从非结构化文本中提取简历字段。" },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.3,
+      max_tokens: 2000
+    });
+
+    // 解析AI返回的JSON
+    let parsedData;
+    try {
+      const aiText = completion.choices[0].message.content;
+      // 清理可能的markdown代码块
+      const jsonStr = aiText.replace(/```json|```/g, '').trim();
+      parsedData = JSON.parse(jsonStr);
+    } catch (e) {
+      // 如果解析失败，返回原始文本让用户手动处理
+      return res.json({ 
+        success: true, 
+        text: text,
+        parsed: null,
+        error: 'AI解析JSON失败，已返回原始文本'
+      });
+    }
+
+    res.json({
+      success: true,
+      text: text.substring(0, 500) + '...',  // 预览
+      parsed: parsedData
+    });
+
+  } catch (error) {
+    console.error('解析错误:', error);
+    res.status(500).json({ error: '解析失败: ' + error.message });
+  }
+});
 
 // Vercel 导出
 module.exports = app;
@@ -117,4 +229,5 @@ if (process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT || 3001;
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }
+
 
