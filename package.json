@@ -11,10 +11,10 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "express": "^4.x",
-    "cors": "^2.x",
-    "@supabase/supabase-js": "^2.x",
-    "openai": "^4.x",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "@supabase/supabase-js": "^2.39.0",
+    "openai": "^4.20.0",
     "pdf-parse": "^1.1.1",
     "mammoth": "^1.6.0"
   }
